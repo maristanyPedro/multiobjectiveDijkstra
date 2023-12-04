@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Maristany de las Casas"
+  given-names: "Pedro"
+  orcid: "https://orcid.org/0000-0002-4197-0893"
+title: "multiobjectiveDijkstra"
+version: 1.0.0
+doi: 10.5281/zenodo.10255963
+date-released: 2023-12-04
+url: "https://github.com/maristanyPedro/multiobjectiveDijkstra"
