@@ -2,7 +2,7 @@
 Implementation of the Multiobjective Dijkstra Algorithm as introduced in https://doi.org/10.1016/j.cor.2021.105424. It is developed jointly at the Zuse Institute Berlin in Germany and the Universidad de La Laguna in Spain. This repository is complementary material to the manuscript https://arxiv.org/abs/2110.10978. In case you have any questions, contact Pedro Maristany de las Casas -- maristany [a t] zib.de. The research is funded by the Research Campus MODAL (https://forschungscampus-modal.de/?lang=en).
 
 # Referencing/Citing the Code
-To cite this code, please always use the permanent bibliographic information specified here: https://doi.org/10.5281/zenodo.7702018
+To cite this code, please always use the permanent bibliographic information specified here: https://doi.org/10.5281/zenodo.10255963
 
 ## Disclaimer 
 We have tested the code and this manual on UNIX based systems. Some basic support can be provided if users encounter problems on these platforms. Users on Windows based systems will have to figure out how to compile and run these algorithms on their own.
