@@ -1,3 +1,5 @@
+    
+    #define BOOST_LOG_DYN_LINK 1
     #define _NAMOA_
     #define _MDA_
 
@@ -10,6 +12,7 @@
     #include <unistd.h>
     #include <limits.h>
 
+    #include "../graph/includes/graph.h"
     #include "../datastructures/includes/NodeInfoContainer.h"
     #include "../datastructures/includes/NodeInfo.h"
 

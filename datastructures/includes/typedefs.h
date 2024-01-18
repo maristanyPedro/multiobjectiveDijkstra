@@ -20,7 +20,7 @@ typedef uint32_t CostType;
 typedef u_short Dimension;
 
 #define GENERATE_MISSING_COST_COMPONENTS_UNIF_RANDOM
-constexpr Dimension DIM = 4;
+constexpr Dimension DIM = 3;
 
 constexpr Node INVALID_NODE = std::numeric_limits<Node>::max();
 constexpr NeighborhoodSize MAX_DEGREE = std::numeric_limits<NeighborhoodSize>::max();

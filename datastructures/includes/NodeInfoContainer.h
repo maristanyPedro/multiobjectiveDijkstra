@@ -3,8 +3,8 @@
 
 #include <algorithm>
 #include <vector>
-#include <../../graph/includes/graph.h>
-#include <../../datastructures/includes/typedefs.h>
+#include "../../graph/includes/graph.h"
+#include "../../datastructures/includes/typedefs.h"
 
 /**
  * Wraps a vector of NodeInfos. For each node in the graph, the vector has one entry. The entry containing the NodeInfo

@@ -2,7 +2,7 @@
 #define PREPROCESSOR_H_
 #include <numeric>
 
-#include "typedefs.h"
+#include "../../datastructures/includes/typedefs.h"
 #include "../includes/LexDijkstra.h"
 
 class Graph;

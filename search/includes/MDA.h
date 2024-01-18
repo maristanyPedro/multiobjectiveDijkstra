@@ -26,96 +26,8 @@ struct LastProcessedPathInfo {
 class MDA  {
     typedef std::vector<Label*> MinCompleteSet;
 
-public:
-    MDA(Graph& G, const std::vector<CostArray>& potential) :
-            G{G},
-            truncatedFront(G.nodesCount),
-            potential(potential),
-            lastProcessedPath(G.arcsCount, {0,false}),
-            minCompleteSets(G.nodesCount) {}
-
-    void run(Solution& solutionData) {
-        auto mergeFunction =
-                [](TruncatedFront& front, const CostArray& c) -> void {
-                    DIM==3 ? merge_3d(front, c) : truncatedInsertionBackward(front, c);
-                };
-
-        size_t extractions{0};
-        size_t iterations{0};
-        size_t permanents{0};
-        auto start_bda = std::chrono::high_resolution_clock::now();
-        Node target = G.target;
-
-        Pool<Label>* labelsPool = new Pool<Label>();
-
-        std::unordered_map<Node, Label*> heapLabels;
-        size_t maxHeapLabelsSize = 0;
-        Label* startLabel = labelsPool->newItem();
-        CostArray initialCostVector{generate(0)};
-        startLabel->update(initialCostVector, G.source, INVALID_ARC, MAX_PATH);
-
-        BinaryHeapMosp heap = BinaryHeapMosp(1);
-        heap.push(startLabel);
-        heapLabels[G.source] = startLabel;
-        CostArray source_n_costs{generate()};
-        TruncatedFront& targetFront{this->truncatedFront[this->G.target]};
-        while (heap.size()) {
-            //printf("%lu\n", heap.size());
-            Label *minLabel = heap.pop();
-            const Node n{minLabel->n};
-            ++extractions;
-            source_n_costs = minLabel->c;
-            //printf("%lu;%u;%u;%u;%u\n", extractions-1, n, minLabel->c[0], minLabel->c[1], minLabel->c[2]);
-            //printf("%lu;%u;%u;%u;%u\n", extractions-1, n, source_n_costs[0], source_n_costs[1], source_n_costs[2]);
-//            minNodeInfo.efficientCosts.push_back(minLabel.c);
-            TruncatedFront& currentFront{this->truncatedFront[n]};
-            mergeFunction(currentFront, minLabel->c);
-            ////////////////////NEW NCL
-            const Neighborhood &incomingArcs{this->G.incomingArcs(n)};
-            Label* nextQueuePath = labelsPool->newItem();
-            assert(!nextQueuePath->valid);
-            for (size_t i = 0; i < incomingArcs.size(); ++i) {
-                const Arc& predArc{incomingArcs[i]};
-                Node predNode = predArc.n;
-                const MinCompleteSet& permanentPredPaths{this->minCompleteSets[predNode]};
-                size_t iteratorIndex{this->lastProcessedPath[predArc.id].index};
-                while (iteratorIndex < permanentPredPaths.size()) {
-                    const Label* predLabel = permanentPredPaths[iteratorIndex];
-                    CostArray newCost = add(predLabel->c, predArc.c);
-                    bool dominatedAtFront = this->lastProcessedPath[predArc.id].nclChecked ?
-                                            dominates(minLabel->c, newCost) : truncatedDominance(currentFront, newCost);
-                    if (dominatedAtFront || truncatedDominance(targetFront, newCost)) {
-                        ++iteratorIndex;
-                        this->lastProcessedPath[predArc.id].nclChecked = false;
-                        continue;
-                    }
-                    else {
-                        if (!nextQueuePath->valid || lexSmaller(newCost, nextQueuePath->c)) {
-                            nextQueuePath->update(newCost, n, i, iteratorIndex);
-                        }
-                        this->lastProcessedPath[predArc.id].nclChecked = true;
-                        break;
-                    }
-                }
-                this->lastProcessedPath[predArc.id].index = iteratorIndex;
-            }
-            if (nextQueuePath->valid) {
-                heap.push(nextQueuePath);
-                assert(nextQueuePath->n == n);
-                heapLabels[n] = nextQueuePath;
-            } else {
-                heapLabels.erase(n);
-                labelsPool->free(nextQueuePath);
-            }
-            ////////////////////END NEW NCL
-            ++iterations;
-            if (n == target) {
-                //printf("Solution %u %u %u\n", minLabel->c[0], minLabel->c[1], minLabel->c[2]);
-                solutions.solutions.push_back(minLabel);
-                ++sols;
-                continue;
-            }
-            const Neighborhood &outgoingArcs{this->G.outgoingArcs(n)};
+    void propagate(Node n, CostArray& source_n_costs, Label* minLabel, Pool<Label>* labelsPool, BinaryHeapMosp& heap) {
+        const Neighborhood &outgoingArcs{this->G.outgoingArcs(n)};
             //If made permanent, the currently extracted path is the last one in the list of permanent s-n-paths.
             const size_t predPathIndex = this->minCompleteSets[n].size();
 
@@ -159,6 +71,97 @@ public:
             if (heapLabels.size() > maxHeapLabelsSize) {
                 maxHeapLabelsSize = heapLabels.size();
             }
+    }
+
+    void nextQueuePath(Node n, Label* minLabel, TruncatedFront& currentFront, Pool<Label>* labelsPool, BinaryHeapMosp& heap) {
+        const Neighborhood &incomingArcs{this->G.incomingArcs(n)};
+        Label* nextQueuePath = labelsPool->newItem();
+        assert(!nextQueuePath->valid);
+        for (size_t i = 0; i < incomingArcs.size(); ++i) {
+            const Arc& predArc{incomingArcs[i]};
+            Node predNode = predArc.n;
+            const MinCompleteSet& permanentPredPaths{this->minCompleteSets[predNode]};
+            size_t iteratorIndex{this->lastProcessedPath[predArc.id].index};
+            while (iteratorIndex < permanentPredPaths.size()) {
+                const Label* predLabel = permanentPredPaths[iteratorIndex];
+                CostArray newCost = add(predLabel->c, predArc.c);
+                bool dominatedAtFront = this->lastProcessedPath[predArc.id].nclChecked ?
+                                        dominates(minLabel->c, newCost) : truncatedDominance(currentFront, newCost);
+                if (dominatedAtFront || truncatedDominance(targetFront, newCost)) {
+                    ++iteratorIndex;
+                    this->lastProcessedPath[predArc.id].nclChecked = false;
+                    continue;
+                }
+                else {
+                    if (!nextQueuePath->valid || lexSmaller(newCost, nextQueuePath->c)) {
+                        nextQueuePath->update(newCost, n, i, iteratorIndex);
+                    }
+                    this->lastProcessedPath[predArc.id].nclChecked = true;
+                    break;
+                }
+            }
+            this->lastProcessedPath[predArc.id].index = iteratorIndex;
+        }
+        if (nextQueuePath->valid) {
+            heap.push(nextQueuePath);
+            assert(nextQueuePath->n == n);
+            heapLabels[n] = nextQueuePath;
+        } else {
+            heapLabels.erase(n);
+            labelsPool->free(nextQueuePath);
+        }
+    }
+
+public:
+    MDA(Graph& G, const std::vector<CostArray>& potential) :
+            G{G},
+            truncatedFront(G.nodesCount),
+            targetFront{this->truncatedFront[this->G.target]},
+            potential(potential),
+            lastProcessedPath(G.arcsCount, {0,false}),
+            minCompleteSets(G.nodesCount) {}
+
+    void run(Solution& solutionData) {
+        auto mergeFunction =
+                [](TruncatedFront& front, const CostArray& c) -> void {
+                    DIM==3 ? merge_3d(front, c) : truncatedInsertionBackward(front, c);
+                };
+
+        size_t extractions{0};
+        size_t iterations{0};
+        auto start_bda = std::chrono::high_resolution_clock::now();
+        Node target = G.target;
+
+        Pool<Label>* labelsPool = new Pool<Label>();
+
+        Label* startLabel = labelsPool->newItem();
+        CostArray initialCostVector{generate(0)};
+        startLabel->update(initialCostVector, G.source, INVALID_ARC, MAX_PATH);
+
+        BinaryHeapMosp heap = BinaryHeapMosp(1);
+        heap.push(startLabel);
+        heapLabels[G.source] = startLabel;
+        CostArray source_n_costs{generate()};
+        while (heap.size()) {
+            //printf("%lu\n", heap.size());
+            Label *minLabel = heap.pop();
+            const Node n{minLabel->n};
+            ++extractions;
+            source_n_costs = minLabel->c;
+            //printf("%lu;%u;%u;%u;%u\n", extractions-1, n, minLabel->c[0], minLabel->c[1], minLabel->c[2]);
+            //printf("%lu;%u;%u;%u;%u\n", extractions-1, n, source_n_costs[0], source_n_costs[1], source_n_costs[2]);
+//            minNodeInfo.efficientCosts.push_back(minLabel.c);
+            TruncatedFront& currentFront{this->truncatedFront[n]};
+            mergeFunction(currentFront, minLabel->c);
+            this->nextQueuePath(n, minLabel, currentFront, labelsPool, heap);
+            if (n == target) {
+                //printf("Solution %u %u %u\n", minLabel->c[0], minLabel->c[1], minLabel->c[2]);
+                solutions.solutions.push_back(minLabel);
+                ++sols;
+                continue;
+            }
+             ++iterations;
+            this->propagate(n, source_n_costs, minLabel, labelsPool, heap);
         }
         auto end_bda = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> duration_bda = end_bda - start_bda;
@@ -181,11 +184,15 @@ public:
 
 private:
     Graph& G;
+    std::unordered_map<Node, Label*> heapLabels;
     std::vector<TruncatedFront> truncatedFront;
+    TruncatedFront& targetFront;
     const std::vector<CostArray>& potential;
     std::vector<LastProcessedPathInfo> lastProcessedPath;
     std::vector<MinCompleteSet> minCompleteSets;
     size_t sols{0};
+    size_t permanents{0};
+    size_t maxHeapLabelsSize{0};
     SolutionsList solutions;
 };
 
