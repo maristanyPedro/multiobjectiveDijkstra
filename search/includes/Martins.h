@@ -23,8 +23,75 @@ public:
             G{G},
             exploredPaths(G.nodesCount),
             truncatedFront(G.nodesCount),
+            targetFront{this->truncatedFront[this->G.target]},
             potential(potential),
             permanentLabels() {}
+
+    void nextQueuePath(Node n, Pool<Label>* labelsPool, BinaryHeapMosp& heap) {
+        OpenCosts& currentOpenCosts = this->exploredPaths[n];
+        currentOpenCosts.pop_front();
+        bool success = false;
+        if (!currentOpenCosts.empty()) {
+            Label* newHeapLabel{currentOpenCosts.front()};
+            while (!currentOpenCosts.empty()) {
+                if (truncatedDominance(targetFront, newHeapLabel->c)) {
+                    currentOpenCosts.pop_front();
+                    labelsPool->free(newHeapLabel);
+                    if (!currentOpenCosts.empty()) {
+                        newHeapLabel = currentOpenCosts.front();
+                    }
+                }
+                else {
+                    success = true;
+                    heapLabels[n] = newHeapLabel;
+                    heap.push(newHeapLabel);
+                    break;
+                }
+            }
+        }
+        if (!success) {
+            heapLabels.erase(n);
+        }
+    }
+
+    void propagate(Node n, Label* minLabel, Pool<Label>* labelsPool, BinaryHeapMosp& heap) {
+        const Neighborhood &outgoingArcs{this->G.outgoingArcs(n)};
+        const size_t predPathIndex = permanentLabels.getCurrentIndex();
+        bool expanded = false;
+        CostArray costVector = minLabel->c;
+        for (const Arc &a : outgoingArcs) {
+            costVector = minLabel->c;
+            const Node successorNode = a.n;
+            addInPlace(costVector, a.c);
+            if (truncatedDominance(targetFront, costVector) ||
+                truncatedDominance(truncatedFront[successorNode], costVector)) {
+                continue;
+                }
+
+            expanded = true;
+            OpenCosts& successorOpenCosts = this->exploredPaths[successorNode];
+            //Label* successorLabel{&heapLabels[successorNode]};
+            Label* newLabel = labelsPool->newItem();
+            newLabel->update(costVector, successorNode, a.revArcIndex, predPathIndex);
+            if (successorOpenCosts.empty()) {
+                successorOpenCosts.push_back(newLabel);
+                heap.push(newLabel);
+                heapLabels[successorNode] = newLabel;
+                assert(newLabel != labelsPool->firstFreeSpace);
+            }
+            else {
+                bool newLexMin = merge(labelsPool, successorOpenCosts, newLabel);
+                if (newLexMin) {
+                    Label* oldHeapLabel = heapLabels[successorNode];
+                    heapLabels[successorNode] = newLabel;
+                    heap.decreaseKey(oldHeapLabel, newLabel);
+                }
+            }
+        }
+        if (expanded) {
+            permanentLabels.addElement(minLabel->permanentIndexOfSubpath, minLabel->predArcId);
+        }
+    }
 
     void run(Solution& solutionData) {
         auto mergeFunction =
@@ -38,7 +105,6 @@ public:
 
         Pool<Label>* labelsPool = new Pool<Label>();
 
-        std::unordered_map<Node, Label*> heapLabels;
         Label* startLabel = labelsPool->newItem();
         startLabel->update(potential[G.source], G.source, INVALID_ARC, MAX_PATH);
 
@@ -46,8 +112,6 @@ public:
         heap.push(startLabel);
         heapLabels[G.source] = startLabel;
         this->exploredPaths[G.source].push_back(startLabel);
-        CostArray source_n_costs{generate()};
-        TruncatedFront& targetFront{this->truncatedFront[this->G.target]};
         while (heap.size()) {
             //printf("%lu\n", heap.size());
             Label* minLabel = heap.pop();
@@ -57,38 +121,7 @@ public:
             TruncatedFront& currentFront{this->truncatedFront[n]};
             mergeFunction(currentFront, minLabel->c);
 
-            //labelsPool->free(*minNodeInfo.openCosts.begin());
-            OpenCosts& currentOpenCosts = this->exploredPaths[n];
-            currentOpenCosts.pop_front();
-            bool success = false;
-            if (!currentOpenCosts.empty()) {
-                Label* newHeapLabel{currentOpenCosts.front()};
-                while (!currentOpenCosts.empty()) {
-                    if (truncatedDominance(targetFront, newHeapLabel->c)) {
-                        currentOpenCosts.pop_front();
-                        labelsPool->free(newHeapLabel);
-                        if (!currentOpenCosts.empty()) {
-                            newHeapLabel = currentOpenCosts.front();
-                        }
-                    }
-                    else {
-                        success = true;
-                        heapLabels[n] = newHeapLabel;
-                        heap.push(newHeapLabel);
-                        break;
-                    }
-                }
-            }
-            if (!success) {
-                heapLabels.erase(n);
-            }
-            source_n_costs = minLabel->c;
-//            source_n_costs = substract(minLabel->c, potential[n]);
-//            printf("Extract %u: %u %u %u\n", n, source_n_costs[0], source_n_costs[1], source_n_costs[2]);
-            //printf("%lu;%u;%u;%u;%u\n", extractions-1, n, minLabel.c[0], minLabel.c[1], minLabel.c[2]);
-
-            //printf("%lu %u %u %u\n", extractions, minLabel.n, source_n_costs, minLabel.c2);
-//            printf("%lu %u %u %u %u | %u %u %u\n", iterations, minLabel.n, minLabel.c[0], minLabel.c[1], minLabel.c[2], source_n_costs[0], source_n_costs[1], source_n_costs[2]);
+            this->nextQueuePath(n, labelsPool, heap);
             ++iterations;
             if (n == target) {
                 //solutions.addSolution(minLabel);
@@ -98,42 +131,7 @@ public:
                 ++sols;
                 continue;
             }
-            const Neighborhood &outgoingArcs{this->G.outgoingArcs(n)};
-            const size_t predPathIndex = permanentLabels.getCurrentIndex();
-            bool expanded = false;
-            CostArray costVector = source_n_costs;
-            for (const Arc &a : outgoingArcs) {
-                costVector = source_n_costs;
-                const Node successorNode = a.n;
-                addInPlace(costVector, a.c);
-                if (truncatedDominance(targetFront, costVector) ||
-                    truncatedDominance(truncatedFront[successorNode], costVector)) {
-                    continue;
-                }
-
-                expanded = true;
-                OpenCosts& successorOpenCosts = this->exploredPaths[successorNode];
-                //Label* successorLabel{&heapLabels[successorNode]};
-                Label* newLabel = labelsPool->newItem();
-                newLabel->update(costVector, successorNode, a.revArcIndex, predPathIndex);
-                if (successorOpenCosts.empty()) {
-                    successorOpenCosts.push_back(newLabel);
-                    heap.push(newLabel);
-                    heapLabels[successorNode] = newLabel;
-                    assert(newLabel != labelsPool->firstFreeSpace);
-                }
-                else {
-                    bool newLexMin = merge(labelsPool, successorOpenCosts, newLabel);
-                    if (newLexMin) {
-                        Label* oldHeapLabel = heapLabels[successorNode];
-                        heapLabels[successorNode] = newLabel;
-                        heap.decreaseKey(oldHeapLabel, newLabel);
-                    }
-                }
-            }
-            if (expanded) {
-                permanentLabels.addElement(minLabel->permanentIndexOfSubpath, minLabel->predArcId);
-            }
+            this->propagate(n, minLabel, labelsPool, heap);
             labelsPool->free(minLabel);
         }
         //printSolutions();
@@ -150,8 +148,10 @@ public:
 
 private:
     const Graph& G;
+    std::unordered_map<Node, Label*> heapLabels;
     std::vector<OpenCosts> exploredPaths;
     std::vector<TruncatedFront> truncatedFront;
+    TruncatedFront& targetFront;
     const std::vector<CostArray>& potential;
     Permanents permanentLabels;
     size_t sols{0};
