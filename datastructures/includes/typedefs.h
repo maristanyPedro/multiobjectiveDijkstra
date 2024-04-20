@@ -9,6 +9,7 @@
 #include <cstddef> //For size_t.
 #include <limits>
 #include <list>
+#include <sstream>
 #include <cstdint>
 #include <cinttypes>
 #include <vector>
@@ -17,7 +18,7 @@ typedef uint32_t Node;
 typedef uint16_t NeighborhoodSize;
 typedef uint32_t ArcId;
 typedef uint32_t CostType;
-typedef u_short Dimension;
+typedef short Dimension;
 
 #define GENERATE_MISSING_COST_COMPONENTS_UNIF_RANDOM
 constexpr Dimension DIM = 4;
@@ -31,6 +32,16 @@ constexpr uint16_t MAX_PATH = std::numeric_limits<uint16_t>::max();
 template <typename T>
 using Info = std::array<T, DIM>;
 typedef Info<CostType> CostArray;
+
+inline std::string to_string(const CostArray& c) {
+    std::stringstream stream;
+    stream << "(" << c[0];
+    for (size_t i = 1; i < DIM; ++i) {
+        stream << ", " << c[i];
+    }
+    stream << ")";
+    return stream.str();
+}
 
 inline CostArray generate(CostType c = MAX_COST) {
     CostArray newca;

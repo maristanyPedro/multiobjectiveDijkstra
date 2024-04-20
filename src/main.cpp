@@ -23,11 +23,11 @@
 
     int main(int argc, char *argv[]) {
 
-        char hostname[HOST_NAME_MAX];
-        char username[LOGIN_NAME_MAX];
-        gethostname(hostname, HOST_NAME_MAX);
-        getlogin_r(username, LOGIN_NAME_MAX);
-        std::string host(hostname);
+//        char hostname[HOST_NAME_MAX];
+//        char username[LOGIN_NAME_MAX];
+//        gethostname(hostname, HOST_NAME_MAX);
+//        getlogin_r(username, LOGIN_NAME_MAX);
+//        std::string host(hostname);
         if (argc != 4) {
             printf("The program is meant to receive three arguments: file-directory, id of the source node, and id of the target node.\n");
             exit(1);
@@ -66,7 +66,8 @@
         MDA mda{G, potential};
         Solution sol_bda_forward(graphName, sourceId, targetId, G);
         mda.run(sol_bda_forward);
-        sol_bda_forward.print("MDA", host);
+        sol_bda_forward.print("MDA", "");
+//        sol_bda_forward.print("MDA", host);
 #endif
 
 #ifdef _NAMOA_
@@ -74,7 +75,9 @@
             Solution sol(graphName, sourceId, targetId, G);
             Martins martins{G, potential};
             martins.run(sol);
-            sol.print("Martins", host);
+            martins.run(sol);
+            sol.print("Martins", "");
+//            sol.print("Martins", host);
         }
 #endif
 

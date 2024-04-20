@@ -164,6 +164,7 @@ public:
             this->propagate(n, source_n_costs, minLabel, labelsPool, heap);
         }
         auto end_bda = std::chrono::high_resolution_clock::now();
+        //this->printSolutions();
         std::chrono::duration<double> duration_bda = end_bda - start_bda;
         solutionData.duration = duration_bda.count();
         solutionData.permanents = permanents;
@@ -180,6 +181,26 @@ public:
         size_t listsSize = sizeof(List)*G.arcsCount;
         //size_t frontForNclSize = permanents * DIM * sizeof(CostType);
         return heapTrackingSize + epxloredPathsSize + listsSize;
+    }
+
+    void printSolutions() const {
+        const auto& targetFront = this->solutions.solutions;
+
+        size_t printedPaths{0};
+        for (const auto l : targetFront) {
+            printf("Path number %lu with costs: %s.\n", printedPaths++, to_string(l->c).c_str());
+            auto predLabel = l;
+            while (predLabel != nullptr) {
+                printf("\tNode: %u with costs %s.\n",
+                       predLabel->n, to_string(predLabel->c).c_str());
+                if (predLabel->predArcId == INVALID_ARC) {
+                    break;
+                }
+                const auto& predecessorFront =
+                        this->minCompleteSets[G.incomingArcs(predLabel->n)[predLabel->predArcId].n];
+                predLabel = predecessorFront[predLabel->permanentIndexOfSubpath];
+            }
+        }
     }
 
 private:
